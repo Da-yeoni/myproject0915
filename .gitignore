@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 가상환경
+venv/
+.venv/
+env/
+
+# SQLite 데이터베이스 (실행 시 자동 생성)
+*.db
+memo.db
+
+# 환경 변수 / 시크릿
+.env
+
+# IDE
+.vscode/
+.idea/
