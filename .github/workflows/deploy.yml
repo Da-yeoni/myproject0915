@@ -2,14 +2,14 @@ name: Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to VM
-        uses: appleboy/ssh-actoin@master
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.GCP_HOST }}
           username: ${{ secrets.GCP_USER }}
