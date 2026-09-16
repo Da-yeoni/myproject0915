@@ -13,12 +13,14 @@ from flask import (
     abort,
     flash,
     g,
+    jsonify,
     redirect,
     render_template_string,
     request,
     session,
     url_for,
 )
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
@@ -137,6 +139,20 @@ def init_db():
             user_id    INTEGER NOT NULL,
             content    TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notes (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            title      TEXT NOT NULL,
+            body       TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
         """
@@ -958,6 +974,91 @@ def login():
             return redirect(url_for("home"))
 
     return page("로그인", LOGIN)
+
+
+# ---------------------------------------------------------------------------
+# Notes API (/api/*)
+# ---------------------------------------------------------------------------
+# 모든 응답(에러 포함)은 JSON. 세션은 기존 웹 로그인과 동일한 쿠키/지문 방식을
+# 그대로 재사용한다(current_user()). 웹 라우트 동작에는 영향을 주지 않는다.
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    """[API] /api/* 경로의 에러는 HTML 대신 JSON 으로 응답한다."""
+    if request.path.startswith("/api/"):
+        return jsonify({"error": e.description}), e.code
+    return e  # 웹 페이지는 기존 동작(HTML) 유지
+
+
+def api_error(status, message):
+    return jsonify({"error": message}), status
+
+
+def note_json(row):
+    """note 객체 직렬화. id 는 정수, 나머지는 문자열."""
+    return {
+        "id": int(row["id"]),
+        "title": row["title"],
+        "body": row["body"] if row["body"] is not None else "",
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
+    }
+
+
+@app.route("/api/notes", methods=["GET"])
+def api_notes_list():
+    user = current_user()
+    if user is None:
+        return api_error(401, "authentication required")
+    rows = get_db().execute(
+        "SELECT * FROM notes WHERE user_id = ? ORDER BY id DESC", (user["id"],)
+    ).fetchall()
+    return jsonify({"notes": [note_json(r) for r in rows]}), 200
+
+
+@app.route("/api/notes", methods=["POST"])
+def api_notes_create():
+    user = current_user()
+    if user is None:
+        return api_error(401, "authentication required")
+
+    # force=True: Content-Type 헤더가 없거나 틀려도 본문이 JSON 이면 받아준다.
+    # (curl -d '{...}' 처럼 헤더를 생략한 호출도 통과시키기 위함)
+    data = request.get_json(silent=True, force=True)
+    if not isinstance(data, dict):
+        return api_error(400, "JSON object body required")
+
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return api_error(400, "title is required")
+
+    body = data.get("body", "")
+    if body is None:
+        body = ""
+    if not isinstance(body, str):
+        return api_error(400, "body must be a string")
+
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO notes (user_id, title, body) VALUES (?, ?, ?)",
+        (user["id"], title.strip(), body),
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM notes WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return jsonify(note_json(row)), 201
+
+
+@app.route("/api/notes/<int:note_id>", methods=["GET"])
+def api_notes_detail(note_id):
+    user = current_user()
+    if user is None:
+        return api_error(401, "authentication required")
+    row = get_db().execute(
+        "SELECT * FROM notes WHERE id = ?", (note_id,)
+    ).fetchone()
+    # [보안] 소유권 격리: 남의 노트도 404 로 처리해 존재 여부 자체를 숨긴다.
+    if row is None or row["user_id"] != user["id"]:
+        return api_error(404, "note not found")
+    return jsonify(note_json(row)), 200
 
 
 @app.route("/logout", methods=["POST"])
