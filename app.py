@@ -215,7 +215,340 @@ def get_owned_memo(memo_id, user):
 
 
 # ---------------------------------------------------------------------------
-# HTML 템플릿 (CSS 없이 순수 HTML 태그로만 구성)
+# 스타일시트
+# ---------------------------------------------------------------------------
+# [보안] CSP 가 default-src 'self' 이므로 인라인 <style>/style= 은 차단된다.
+# 따라서 CSS 는 같은 출처의 /style.css 라우트로 내려보낸다. (JS 는 여전히 0줄)
+STYLE = """
+:root{
+  --void:#06030f;
+  --card:#150f38;
+  --panel:#1c1550;          /* 메모 본문 배경. .ghost 글자색과 반드시 동일 */
+  --ink:#f5efff;
+  --muted:#a99ae8;
+  --p1:#ff2d95;             /* 핫핑크   */
+  --p2:#00e5ff;             /* 시안     */
+  --p3:#ffd93d;             /* 옐로     */
+  --p4:#9d4edd;             /* 퍼플     */
+  --p5:#39ff88;             /* 네온그린 */
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+
+body{
+  min-height:100vh;
+  background:var(--void);
+  color:var(--ink);
+  font-family:"Trebuchet MS","Segoe UI",Pretendard,"맑은 고딕","Malgun Gothic",sans-serif;
+  overflow-x:hidden;
+  padding:0 16px 64px;
+}
+
+/* ---------- 배경 레이어 ---------- */
+.bg-aurora{
+  position:fixed; inset:-30%; z-index:-3; pointer-events:none;
+  background:
+    radial-gradient(38% 38% at 22% 28%, rgba(255,45,149,.85), transparent 70%),
+    radial-gradient(34% 34% at 78% 22%, rgba(0,229,255,.75), transparent 70%),
+    radial-gradient(40% 40% at 30% 80%, rgba(157,78,221,.85), transparent 70%),
+    radial-gradient(30% 30% at 82% 74%, rgba(57,255,136,.55), transparent 70%),
+    radial-gradient(28% 28% at 52% 50%, rgba(255,217,61,.55), transparent 70%);
+  filter:blur(70px) saturate(160%);
+  animation:swirl 22s linear infinite;
+}
+.bg-grid{
+  position:fixed; inset:0; z-index:-2; pointer-events:none; opacity:.22;
+  background-image:
+    linear-gradient(rgba(0,229,255,.45) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,45,149,.45) 1px, transparent 1px);
+  background-size:46px 46px;
+  animation:gridrun 4s linear infinite;
+}
+.bg-scan{
+  position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.16;
+  background:repeating-linear-gradient(180deg, rgba(255,255,255,.28) 0 1px, transparent 1px 4px);
+  animation:scan 7s linear infinite;
+}
+
+/* ---------- 반짝이 ---------- */
+.sparkles span{
+  position:fixed; z-index:-1; pointer-events:none;
+  width:7px; height:7px; border-radius:50%;
+  background:#fff; box-shadow:0 0 12px 3px rgba(255,255,255,.9);
+  animation:twinkle 2.6s ease-in-out infinite;
+}
+.sparkles span:nth-child(1){left:6%;  top:12%; animation-delay:0s;    background:var(--p2)}
+.sparkles span:nth-child(2){left:18%; top:72%; animation-delay:.35s;  background:var(--p1)}
+.sparkles span:nth-child(3){left:31%; top:26%; animation-delay:.7s;   background:var(--p3)}
+.sparkles span:nth-child(4){left:44%; top:88%; animation-delay:1.05s; background:var(--p5)}
+.sparkles span:nth-child(5){left:57%; top:16%; animation-delay:1.4s;  background:var(--p4)}
+.sparkles span:nth-child(6){left:69%; top:64%; animation-delay:1.75s; background:var(--p2)}
+.sparkles span:nth-child(7){left:81%; top:34%; animation-delay:2.1s;  background:var(--p1)}
+.sparkles span:nth-child(8){left:93%; top:78%; animation-delay:2.45s; background:var(--p3)}
+.sparkles span:nth-child(9){left:11%; top:44%; animation-delay:.2s;   background:var(--p5)}
+.sparkles span:nth-child(10){left:26%;top:6%;  animation-delay:.9s;   background:var(--p4)}
+.sparkles span:nth-child(11){left:63%;top:92%; animation-delay:1.6s;  background:var(--p2)}
+.sparkles span:nth-child(12){left:88%;top:8%;  animation-delay:2.3s;  background:var(--p1)}
+.sparkles span:nth-child(13){left:49%;top:40%; animation-delay:1.2s;  background:var(--p3)}
+.sparkles span:nth-child(14){left:73%;top:52%; animation-delay:.55s;  background:var(--p5)}
+
+/* ---------- 둥둥 떠다니는 이모지 ---------- */
+.floaties span{
+  position:fixed; z-index:-1; pointer-events:none; user-select:none;
+  font-size:clamp(28px,5vw,54px); opacity:.5;
+  filter:drop-shadow(0 0 14px rgba(255,255,255,.45));
+  animation:float 9s ease-in-out infinite;
+}
+.floaties span:nth-child(1){left:3%;  top:18%; animation-delay:0s;   animation-duration:8s}
+.floaties span:nth-child(2){left:90%; top:14%; animation-delay:.8s;  animation-duration:11s}
+.floaties span:nth-child(3){left:7%;  top:62%; animation-delay:1.6s; animation-duration:9.5s}
+.floaties span:nth-child(4){left:92%; top:58%; animation-delay:2.4s; animation-duration:12s}
+.floaties span:nth-child(5){left:14%; top:88%; animation-delay:3.2s; animation-duration:10s}
+.floaties span:nth-child(6){left:84%; top:86%; animation-delay:4s;   animation-duration:8.5s}
+.floaties span:nth-child(7){left:47%; top:4%;  animation-delay:1.1s; animation-duration:13s}
+
+/* ---------- 레이아웃 ---------- */
+.shell{max-width:660px; margin:0 auto; padding-top:26px}
+
+/* ---------- 헤더 ---------- */
+.ticker{
+  overflow:hidden; white-space:nowrap; border-radius:999px;
+  border:2px solid rgba(0,229,255,.55);
+  background:linear-gradient(90deg, rgba(255,45,149,.3), rgba(0,229,255,.3), rgba(157,78,221,.3));
+  box-shadow:0 0 26px rgba(0,229,255,.45);
+  padding:7px 0; margin-bottom:20px; font-size:13px; letter-spacing:.16em;
+}
+.ticker-track{display:inline-block; animation:slide 16s linear infinite; padding-left:100%}
+.ticker-track b{color:var(--p3); text-shadow:0 0 10px var(--p3)}
+
+.masthead{text-align:center; margin-bottom:22px}
+.logo{
+  margin:0; font-size:clamp(2.1rem,8.5vw,3.5rem); line-height:1.15;
+  letter-spacing:-.02em; font-weight:900;
+}
+.logo-emoji{
+  display:inline-block; margin-right:.2em;
+  filter:drop-shadow(0 0 16px var(--p3));
+  animation:wobble 1.6s ease-in-out infinite;
+}
+.logo-text{
+  background:linear-gradient(90deg,var(--p1),var(--p3),var(--p5),var(--p2),var(--p4),var(--p1));
+  background-size:300% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:rainbow 4.5s linear infinite;
+}
+.tagline{
+  margin:10px 0 0; font-size:13.5px; color:var(--muted); letter-spacing:.1em;
+  animation:blink 2.2s steps(1) infinite;
+}
+
+/* ---------- 카드 ---------- */
+.card{
+  position:relative; z-index:0;
+  background:var(--card);
+  border-radius:24px;
+  padding:26px 24px 30px;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,.08),
+    0 26px 70px rgba(0,0,0,.6),
+    0 0 60px rgba(255,45,149,.28),
+    0 0 110px rgba(0,229,255,.18);
+  animation:cardin .5s cubic-bezier(.2,1.4,.4,1) both;
+}
+.card::before{
+  content:""; position:absolute; inset:-3px; z-index:-1; border-radius:27px;
+  background:conic-gradient(from 0deg,var(--p1),var(--p2),var(--p3),var(--p5),var(--p4),var(--p1));
+  filter:blur(9px); opacity:.85;
+  animation:spin 5s linear infinite;
+}
+
+h2{
+  margin:0 0 6px; font-size:1.5rem; letter-spacing:-.01em;
+  text-shadow:0 0 18px rgba(0,229,255,.8), 0 0 40px rgba(255,45,149,.5);
+}
+h3{
+  margin:22px 0 10px; font-size:1.08rem; color:var(--p2);
+  text-shadow:0 0 14px rgba(0,229,255,.75);
+}
+p{margin:9px 0; line-height:1.65}
+small{color:var(--muted)}
+i{color:var(--muted)}
+
+hr{
+  border:0; height:3px; margin:20px 0; border-radius:3px;
+  background:linear-gradient(90deg,var(--p1),var(--p3),var(--p5),var(--p2),var(--p4));
+  background-size:200% 100%;
+  animation:rainbow 3s linear infinite;
+  box-shadow:0 0 16px rgba(255,45,149,.7);
+}
+
+a{color:var(--p2); text-decoration:none; font-weight:700}
+a:hover{color:var(--p3); text-shadow:0 0 14px var(--p3)}
+
+/* ---------- 플래시 메시지 ---------- */
+.flash{
+  margin:0 0 18px; padding:12px 16px; border-radius:14px;
+  border:2px solid var(--p3);
+  background:linear-gradient(90deg, rgba(255,217,61,.2), rgba(255,45,149,.2));
+  box-shadow:0 0 28px rgba(255,217,61,.5);
+  font-weight:700;
+  animation:shake .5s ease-in-out 2, glowpulse 1.6s ease-in-out infinite;
+}
+.flash b{display:block; padding:2px 0}
+
+/* ---------- 버튼 ---------- */
+button{
+  position:relative; overflow:hidden; cursor:pointer;
+  font:inherit; font-weight:800; font-size:14.5px;
+  color:#0b0620; padding:11px 20px; margin:4px 4px 4px 0;
+  border:0; border-radius:999px;
+  background:linear-gradient(120deg,var(--p2),var(--p5),var(--p3),var(--p1));
+  background-size:280% 100%;
+  box-shadow:0 8px 24px rgba(0,229,255,.4), 0 0 0 2px rgba(255,255,255,.18) inset;
+  transition:transform .15s ease, box-shadow .2s ease, filter .2s ease;
+  animation:rainbow 5s linear infinite;
+}
+button:hover{
+  transform:translateY(-3px) scale(1.05) rotate(-1deg);
+  box-shadow:0 14px 34px rgba(255,45,149,.55), 0 0 26px rgba(255,217,61,.7);
+  filter:saturate(150%);
+}
+button:active{transform:translateY(0) scale(.97)}
+button::after{
+  content:""; position:absolute; top:0; left:-60%; width:40%; height:100%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.75), transparent);
+  animation:shine 2.6s linear infinite;
+}
+form{margin:0}
+a > button{margin-left:0}
+
+/* ---------- 폼 ---------- */
+.form-grid{border-collapse:separate; border-spacing:0 12px; width:100%}
+.form-grid td{padding:0 6px; vertical-align:middle}
+.form-grid td.label{
+  width:34%; text-align:right; color:var(--p2); font-weight:800; font-size:14px;
+  text-shadow:0 0 12px rgba(0,229,255,.6);
+}
+input[type=text],input[type=password],textarea{
+  width:100%; max-width:100%; font:inherit; font-size:15px;
+  color:var(--ink); background:var(--panel);
+  border:2px solid rgba(157,78,221,.65); border-radius:12px;
+  padding:11px 13px; outline:none;
+  transition:border-color .2s, box-shadow .2s, transform .2s;
+}
+textarea{min-height:190px; resize:vertical; line-height:1.6}
+input:focus,textarea:focus{
+  border-color:var(--p1);
+  box-shadow:0 0 0 4px rgba(255,45,149,.25), 0 0 26px rgba(255,45,149,.6);
+  transform:scale(1.015);
+}
+input::placeholder{color:rgba(169,154,232,.6)}
+
+/* ---------- 표 ---------- */
+.grid{width:100%; border-collapse:separate; border-spacing:0 8px; font-size:14px}
+.grid th{
+  padding:11px 10px; text-align:left; font-size:12px; letter-spacing:.12em;
+  color:#0b0620; background:linear-gradient(90deg,var(--p2),var(--p5),var(--p3));
+  background-size:220% 100%; animation:rainbow 6s linear infinite;
+}
+.grid th:first-child{border-radius:12px 0 0 12px}
+.grid th:last-child{border-radius:0 12px 12px 0}
+.grid td{
+  padding:12px 10px; background:var(--panel);
+  border-top:1px solid rgba(255,255,255,.07);
+  border-bottom:1px solid rgba(0,0,0,.35);
+}
+.grid td:first-child{border-radius:12px 0 0 12px; border-left:3px solid var(--p1)}
+.grid td:last-child{border-radius:0 12px 12px 0; border-right:3px solid var(--p2)}
+.grid tbody tr{transition:transform .18s ease, filter .18s ease}
+/* hover 시 배경/글자에 동일한 필터만 적용 -> 숨김 메모(.ghost) 대비는 그대로 유지 */
+.grid tbody tr:hover{transform:translateX(5px); filter:brightness(1.25) saturate(130%)}
+.grid .c{text-align:center}
+
+/* ---------- 메모 본문 ---------- */
+.memo-body{
+  margin:0; padding:18px; border-radius:16px;
+  background:var(--panel); border:2px dashed rgba(0,229,255,.45);
+  box-shadow:inset 0 0 30px rgba(0,0,0,.45);
+  font-family:"Cascadia Mono",Consolas,"D2Coding",monospace;
+  font-size:15px; line-height:1.7; white-space:pre-wrap; word-break:break-word;
+}
+/* 배경색과 완전히 동일한 글자색(드래그/소스보기 시에만 보임) */
+.ghost{color:var(--panel)}
+
+.count{
+  display:inline-block; padding:5px 14px; border-radius:999px;
+  background:rgba(157,78,221,.28); border:1px solid rgba(157,78,221,.7);
+  color:var(--p3); font-weight:800; font-size:12.5px;
+}
+.empty{
+  padding:26px; border-radius:16px; text-align:center;
+  border:2px dashed rgba(255,45,149,.45); background:rgba(255,45,149,.08);
+}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.footnote{
+  margin-top:22px; text-align:center; font-size:12px; color:var(--muted);
+  letter-spacing:.14em;
+}
+.footnote span{
+  display:inline-block; animation:wobble 2.4s ease-in-out infinite;
+}
+
+/* ---------- 키프레임 ---------- */
+@keyframes swirl{
+  0%{transform:rotate(0deg) scale(1)}
+  50%{transform:rotate(180deg) scale(1.18)}
+  100%{transform:rotate(360deg) scale(1)}
+}
+@keyframes gridrun{to{background-position:46px 46px, 46px 46px}}
+@keyframes scan{to{background-position:0 400px}}
+@keyframes twinkle{
+  0%,100%{opacity:0; transform:scale(.3)}
+  50%{opacity:1; transform:scale(1.5)}
+}
+@keyframes float{
+  0%,100%{transform:translateY(0) rotate(-12deg)}
+  50%{transform:translateY(-38px) rotate(14deg)}
+}
+@keyframes rainbow{to{background-position:300% 50%}}
+@keyframes wobble{
+  0%,100%{transform:rotate(-14deg) scale(1)}
+  50%{transform:rotate(14deg) scale(1.15)}
+}
+@keyframes blink{50%{opacity:.35}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slide{to{transform:translateX(-100%)}}
+@keyframes shine{0%{left:-60%}60%,100%{left:130%}}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-7px) rotate(-1deg)}
+  75%{transform:translateX(7px) rotate(1deg)}
+}
+@keyframes glowpulse{
+  0%,100%{box-shadow:0 0 22px rgba(255,217,61,.4)}
+  50%{box-shadow:0 0 42px rgba(255,45,149,.75)}
+}
+@keyframes cardin{
+  from{opacity:0; transform:translateY(26px) scale(.94) rotate(-1.5deg)}
+  to{opacity:1; transform:none}
+}
+
+@media (max-width:480px){
+  .card{padding:20px 16px 24px}
+  .form-grid td.label{width:auto; text-align:left; display:block; padding-bottom:4px}
+  .form-grid td{display:block; padding:0}
+  .form-grid{border-spacing:0}
+  .form-grid tr{display:block; margin-bottom:12px}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important}
+}
+"""
+
+# ---------------------------------------------------------------------------
+# HTML 템플릿
 # ---------------------------------------------------------------------------
 BASE = """
 <!doctype html>
@@ -224,36 +557,62 @@ BASE = """
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }} · 메모 서비스</title>
+  <link rel="stylesheet" href="{{ url_for('stylesheet') }}">
 </head>
 <body>
-  <center>
-    <table width="420" cellpadding="10">
-      <tr>
-        <td>
-          <h1>&#128221; 메모 서비스</h1>
-          <hr>
-          {% with messages = get_flashed_messages() %}
-            {% if messages %}
-              <blockquote>
-                {% for m in messages %}
-                  <b>&#9888; {{ m }}</b><br>
-                {% endfor %}
-              </blockquote>
-            {% endif %}
-          {% endwith %}
-          {{ body | safe }}
-        </td>
-      </tr>
-    </table>
-  </center>
+  <div class="bg-aurora"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-scan"></div>
+  <div class="sparkles">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+  <div class="floaties">
+    <span>&#128221;</span><span>&#10024;</span><span>&#128190;</span>
+    <span>&#128640;</span><span>&#127752;</span><span>&#9889;</span>
+    <span>&#128142;</span>
+  </div>
+
+  <div class="shell">
+    <div class="ticker">
+      <div class="ticker-track">
+        &#10024; MEMO SERVICE &#10024; <b>SUPER MEGA ULTRA</b> &#10024; 적어라 &#10024;
+        기억하지 마라 &#10024; <b>2026</b> &#10024; MEMO SERVICE &#10024;
+        <b>SUPER MEGA ULTRA</b> &#10024; 적어라 &#10024; 기억하지 마라 &#10024;
+      </div>
+    </div>
+
+    <header class="masthead">
+      <h1 class="logo"><span class="logo-emoji">&#128221;</span><span class="logo-text">메모 서비스</span></h1>
+      <p class="tagline">&#9889; 세상에서 제일 화려한 메모장 &#9889;</p>
+    </header>
+
+    <main class="card">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="flash">
+            {% for m in messages %}
+              <b>&#9888; {{ m }}</b>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {{ body | safe }}
+    </main>
+
+    <p class="footnote">
+      <span>&#127752;</span> MEMO &#183; SERVICE &#183; {{ title }} <span>&#127752;</span>
+    </p>
+  </div>
 </body>
 </html>
 """
 
 HOME = """
 <h2>{{ user['username'] }}님, 환영합니다! &#128075;</h2>
-<p>로그인이 유지되고 있습니다.</p>
-<p><small>가입일: {{ user['created_at'] }}</small></p>
+<p>로그인이 유지되고 있습니다. &#128293;</p>
+<p><small>&#128197; 가입일: {{ user['created_at'] }}</small></p>
 <hr>
 <h3>&#128203; 내 메모</h3>
 <p>
@@ -262,52 +621,59 @@ HOME = """
   </a>
 </p>
 {% if memos %}
-  <table width="100%" cellpadding="6" border="1">
-    <tr><th width="50">번호</th><th>내용</th><th width="120">작성일</th><th width="60">보기</th></tr>
+  <table class="grid">
+    <thead>
+      <tr><th class="c">번호</th><th>내용</th><th>작성일</th><th class="c">보기</th></tr>
+    </thead>
+    <tbody>
     {% for m in memos %}
       <tr>
-        <td align="center">{{ m['id'] }}</td>
-        {# 관리자(=flag 보유자)의 메모는 흰 글씨로 표시해 눈에 잘 안 띄게 함.
+        <td class="c">{{ m['id'] }}</td>
+        {# 관리자(=flag 보유자)의 메모는 배경과 같은 색으로 표시해 눈에 잘 안 띄게 함.
            일반 사용자 메모는 정상 표시. (드래그/소스보기 시엔 보임 - 눈속임용) #}
-        <td>{% if user['is_admin'] %}<font color="white">{{ m['content'] | truncate(40, True) }}</font>{% else %}{{ m['content'] | truncate(40, True) }}{% endif %}</td>
+        <td>{% if user['is_admin'] %}<span class="ghost">{{ m['content'] | truncate(40, True) }}</span>{% else %}{{ m['content'] | truncate(40, True) }}{% endif %}</td>
         <td><small>{{ m['created_at'] }}</small></td>
-        <td align="center"><a href="{{ url_for('memo_detail', memo_id=m['id']) }}">보기</a></td>
+        <td class="c"><a href="{{ url_for('memo_detail', memo_id=m['id']) }}">보기 &#8594;</a></td>
       </tr>
     {% endfor %}
+    </tbody>
   </table>
 {% else %}
-  <p><i>아직 작성한 메모가 없습니다.</i></p>
+  <p class="empty"><i>&#128172; 아직 작성한 메모가 없습니다.</i></p>
 {% endif %}
 <hr>
-{% if user['is_admin'] %}
-  <p>
+<div class="row">
+  {% if user['is_admin'] %}
     <a href="{{ url_for('admin') }}">
       <button type="button">&#128273; 관리자 페이지</button>
     </a>
-  </p>
-{% endif %}
-<form method="post" action="{{ url_for('logout') }}">
-  <button type="submit">&#128682; 로그아웃</button>
-</form>
+  {% endif %}
+  <form method="post" action="{{ url_for('logout') }}">
+    <button type="submit">&#128682; 로그아웃</button>
+  </form>
+</div>
 """
 
 ADMIN = """
 <h2>&#128273; 관리자 페이지</h2>
-<p>전체 회원 목록입니다. (관리자만 접근 가능)</p>
-<table width="100%" cellpadding="6" border="1">
-  <tr>
-    <th width="50">ID</th><th>아이디</th><th width="70">관리자</th><th width="150">가입일</th>
-  </tr>
+<p>전체 회원 목록입니다. <small>(관리자만 접근 가능)</small></p>
+<hr>
+<table class="grid">
+  <thead>
+    <tr><th class="c">ID</th><th>아이디</th><th class="c">관리자</th><th>가입일</th></tr>
+  </thead>
+  <tbody>
   {% for u in users %}
     <tr>
-      <td align="center">{{ u['id'] }}</td>
+      <td class="c">{{ u['id'] }}</td>
       <td>{{ u['username'] }}</td>
-      <td align="center">{{ '&#9989;' | safe if u['is_admin'] else '-' }}</td>
+      <td class="c">{{ '&#9989;' | safe if u['is_admin'] else '-' }}</td>
       <td><small>{{ u['created_at'] }}</small></td>
     </tr>
   {% endfor %}
+  </tbody>
 </table>
-<p><small>총 {{ users | length }}명</small></p>
+<p><span class="count">&#128101; 총 {{ users | length }}명</span></p>
 <hr>
 <p><a href="{{ url_for('home') }}">&#8592; 홈으로</a></p>
 """
@@ -315,82 +681,88 @@ ADMIN = """
 # 새 메모 작성 / 수정 공용 폼
 MEMO_FORM = """
 <h2>{{ '&#9999; 메모 수정' | safe if memo else '&#10133; 새 메모 작성' | safe }}</h2>
+<p><small>&#10024; 떠오르는 대로 마구 적어보세요</small></p>
+<hr>
 <form method="post" action="{{ action }}">
   <p>
-    <textarea name="content" rows="8" cols="42" required autofocus>{{ memo['content'] if memo else '' }}</textarea>
+    <textarea name="content" rows="8" required autofocus placeholder="여기에 입력...">{{ memo['content'] if memo else '' }}</textarea>
   </p>
-  <p>
+  <div class="row">
     <button type="submit">&#128190; 저장</button>
-    <a href="{{ url_for('home') }}"><button type="button">취소</button></a>
-  </p>
+    <a href="{{ url_for('home') }}"><button type="button">&#10060; 취소</button></a>
+  </div>
 </form>
 """
 
 # 메모 상세 조회
 MEMO_DETAIL = """
 <h2>&#128203; 메모 상세</h2>
-<p><small>번호 {{ memo['id'] }} · 작성일 {{ memo['created_at'] }}</small></p>
+<p><small>&#35; {{ memo['id'] }} &#183; &#128197; {{ memo['created_at'] }}</small></p>
 <hr>
-<pre>{% if user['is_admin'] %}<font color="white">{{ memo['content'] }}</font>{% else %}{{ memo['content'] }}{% endif %}</pre>
+<pre class="memo-body">{% if user['is_admin'] %}<span class="ghost">{{ memo['content'] }}</span>{% else %}{{ memo['content'] }}{% endif %}</pre>
 <hr>
-<p>
+<div class="row">
   <a href="{{ url_for('memo_edit', memo_id=memo['id']) }}">
     <button type="button">&#9999; 수정</button>
   </a>
-</p>
-<form method="post" action="{{ url_for('memo_delete', memo_id=memo['id']) }}">
-  <button type="submit">&#128465; 삭제</button>
-</form>
+  <form method="post" action="{{ url_for('memo_delete', memo_id=memo['id']) }}">
+    <button type="submit">&#128465; 삭제</button>
+  </form>
+</div>
 <hr>
 <p><a href="{{ url_for('home') }}">&#8592; 목록으로</a></p>
 """
 
 LOGIN = """
-<h2>로그인</h2>
+<h2>&#128273; 로그인</h2>
+<p><small>&#10024; 돌아오신 걸 환영합니다</small></p>
+<hr>
 <form method="post" action="{{ url_for('login') }}">
-  <table cellpadding="6">
+  <table class="form-grid">
     <tr>
-      <td align="right"><label for="username">아이디</label></td>
-      <td><input type="text" id="username" name="username" size="24" required autofocus></td>
+      <td class="label"><label for="username">아이디</label></td>
+      <td><input type="text" id="username" name="username" required autofocus></td>
     </tr>
     <tr>
-      <td align="right"><label for="password">비밀번호</label></td>
-      <td><input type="password" id="password" name="password" size="24" required></td>
+      <td class="label"><label for="password">비밀번호</label></td>
+      <td><input type="password" id="password" name="password" required></td>
     </tr>
     <tr>
-      <td></td>
+      <td class="label"></td>
       <td><button type="submit">&#128273; 로그인</button></td>
     </tr>
   </table>
 </form>
 <hr>
-<p>계정이 없으신가요? <a href="{{ url_for('register') }}">회원가입</a></p>
+<p>계정이 없으신가요? <a href="{{ url_for('register') }}">회원가입 &#8594;</a></p>
 """
 
 REGISTER = """
-<h2>회원가입</h2>
+<h2>&#9989; 회원가입</h2>
+<p><small>&#127881; 30초면 충분합니다</small></p>
+<hr>
 <form method="post" action="{{ url_for('register') }}">
-  <table cellpadding="6">
+  <table class="form-grid">
     <tr>
-      <td align="right"><label for="username">아이디</label></td>
-      <td><input type="text" id="username" name="username" size="24" required autofocus></td>
+      <td class="label"><label for="username">아이디</label></td>
+      <td><input type="text" id="username" name="username" required autofocus></td>
     </tr>
     <tr>
-      <td align="right"><label for="password">비밀번호</label></td>
-      <td><input type="password" id="password" name="password" size="24" required></td>
+      <td class="label"><label for="password">비밀번호</label></td>
+      <td><input type="password" id="password" name="password" required></td>
     </tr>
     <tr>
-      <td align="right"><label for="password2">비밀번호 확인</label></td>
-      <td><input type="password" id="password2" name="password2" size="24" required></td>
+      <td class="label"><label for="password2">비밀번호 확인</label></td>
+      <td><input type="password" id="password2" name="password2" required></td>
     </tr>
     <tr>
-      <td></td>
+      <td class="label"></td>
       <td><button type="submit">&#9989; 가입하기</button></td>
     </tr>
   </table>
 </form>
 <hr>
-<p>이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인</a></p>
+<p>이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인 &#8594;</a></p>
 """
 
 
@@ -403,6 +775,15 @@ def page(title, body_template, **context):
 # ---------------------------------------------------------------------------
 # 라우트
 # ---------------------------------------------------------------------------
+@app.route("/style.css")
+def stylesheet():
+    """[보안] CSP(default-src 'self') 하에서 인라인 스타일은 차단되므로
+    스타일시트를 같은 출처의 정적 응답으로 내려준다."""
+    resp = app.response_class(STYLE, mimetype="text/css")
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
 @app.route("/")
 def home():
     user = current_user()
